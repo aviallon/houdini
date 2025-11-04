@@ -11,14 +11,18 @@ import (
 func TestInsertOperationInput(t *testing.T) {
 	tests.RunTable(t, tests.Table[config.PluginConfig, *plugin.HoudiniCore]{
 		Schema: `
+			input UserFilterInput {
+				name: String
+			}
+
 			type Query {
-				users(limit: Int, offset: Int): [User!]!
+				users(filter: UserFilterInput, limit: Int, offset: Int): [User!]!
 			}
 
 			type User {
 				id: ID!
 				firstName: String!
-        field(filter: String): String
+				field(filter: String): String
 			}
 		`,
 		Tests: []tests.Test[config.PluginConfig]{
@@ -127,6 +131,50 @@ func TestInsertOperationInput(t *testing.T) {
 					`),
 					tests.ExpectedDoc(`
 						fragment All_Users_toggle on User {
+							firstName
+							id
+							__typename
+						}
+					`),
+				},
+			},
+			{
+				Name: "@paginate with object input",
+				Pass: true,
+				Input: []string{
+					`
+						query FilteredUsers {
+							users(filter: { name: "Seppe" }, limit: 10) @paginate(name: "Filtered_Users") {
+								firstName
+							}
+						}
+					`,
+				},
+				Expected: []tests.ExpectedDocument{
+					tests.ExpectedDoc(`
+						query FilteredUsers($limit: Int = 10, $offset: Int) @dedupe(match: Variables) {
+							users(filter: { name: "Seppe" }, limit: $limit, offset: $offset) @paginate(name: "Filtered_Users") {
+								firstName
+								__typename
+								id
+							}
+						}
+					`),
+					tests.ExpectedDoc(`
+						fragment Filtered_Users_insert on User {
+							firstName
+							id
+							__typename
+						}
+					`),
+					tests.ExpectedDoc(`
+						fragment Filtered_Users_remove on User {
+							id
+							__typename
+						}
+					`),
+					tests.ExpectedDoc(`
+						fragment Filtered_Users_toggle on User {
 							firstName
 							id
 							__typename
